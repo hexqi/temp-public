@@ -3,20 +3,48 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const axios = require('axios');
+const RPCClient = require('@alicloud/pop-core').RPCClient;
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ==================== Token 服务类 ====================
+class TokenService {
+  constructor() {
+    this.accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
+    this.accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
+    
+    if (!this.accessKeyId || !this.accessKeySecret) {
+      throw new Error('请配置阿里云 ACCESS_KEY_ID 和 ACCESS_KEY_SECRET');
+    }
+
+    // 初始化阿里云客户端
+    this.client = new RPCClient({
+      accessKeyId: this.accessKeyId,
+      accessKeySecret: this.accessKeySecret,
+      endpoint: 'https://nls-meta.cn-shanghai.aliyuncs.com',
+      apiVersion: '2019-02-28'
+    });
+  }
+
+  // 获取Token
+  async createToken() {
+    const result = await this.client.request('CreateToken', {}, {
+      method: 'POST'
+    });
+    return result;
+  }
+}
 
 // ==================== ASR 服务类 ====================
 class AsrService {
   constructor() {
     this.baseUrl = process.env.ALIYUN_ASR_URL;
     this.appkey = process.env.ALIYUN_APPKEY;
-    this.token = process.env.ALIYUN_TOKEN;
     
-    if (!this.appkey || !this.token) {
-      throw new Error('请配置阿里云APPKEY和TOKEN');
+    if (!this.appkey) {
+      throw new Error('请配置阿里云APPKEY');
     }
   }
 
@@ -36,9 +64,9 @@ class AsrService {
     return `${this.baseUrl}?${params.toString()}`;
   }
 
-  buildHeaders(contentLength = null) {
+  buildHeaders(token, contentLength = null) {
     const headers = {
-      'X-NLS-Token': this.token,
+      'X-NLS-Token': token,
       'User-Agent': 'aliyun-asr-proxy/1.0.0'
     };
 
@@ -65,10 +93,10 @@ class AsrService {
     }
   }
 
-  async recognizeSpeech(audioBuffer, options = {}) {
+  async recognizeSpeech(audioBuffer, token, options = {}) {
     try {
       const url = this.buildRequestUrl(options);
-      const headers = this.buildHeaders(audioBuffer.length);
+      const headers = this.buildHeaders(token, audioBuffer.length);
 
       console.log(`发送ASR请求: ${url}`);
       
@@ -93,12 +121,14 @@ class AsrService {
   }
 }
 
+const tokenService = new TokenService();
 const asrService = new AsrService();
 
 // ==================== 中间件配置 ====================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
 // ==================== Multer 文件上传配置 ====================
 const upload = multer({
@@ -146,8 +176,24 @@ const validateAsrRequest = (req, res, next) => {
 
 // ==================== 路由 ====================
 
-app.get('/api/asr/ping',  async (req, res, next) => {
+app.get('/api/asr/ping', async (req, res, next) => {
   return res.json({ success: true, data: 'ping success', timestamp: new Date().toISOString() })
+})
+
+// 获取阿里云Token接口
+app.get('/api/token', async (req, res, next) => {
+  try {
+    const result = await tokenService.createToken();
+    
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    next(error);
+  }
 })
 
 // ASR 语音识别接口
@@ -158,6 +204,14 @@ app.post('/api/asr/recognize', upload.single('audio'), validateAsrRequest, async
         success: false,
         error: 'MISSING_AUDIO_FILE',
         message: '请上传音频文件'
+      });
+    }
+
+    if (!req.body.token) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_TOKEN',
+        message: '请提供阿里云Token'
       });
     }
 
@@ -172,7 +226,7 @@ app.post('/api/asr/recognize', upload.single('audio'), validateAsrRequest, async
       disfluency: req.body.disfluency === 'true'
     };
 
-    const result = await asrService.recognizeSpeech(req.file.buffer, options);
+    const result = await asrService.recognizeSpeech(req.file.buffer, req.body.token, options);
     
     res.json({
       success: true,
