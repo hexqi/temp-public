@@ -333,7 +333,7 @@ app.post('/api/v1/ai/chat/completions', async (req, res) => {
 });
 
 // Prompt Chat 接口 - 使用预设的prompt作为系统提示词，支持占位符参数
-app.post('/api/v1/ai/prompt/chat', async (req, res) => {
+app.post('/api/v1/ai/prompt/chat/completions', async (req, res) => {
   const authHeader = req.headers['authorization'] || '';
   const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
   if (!bearer || bearer !== ACCESS_TOKEN) {
@@ -363,7 +363,7 @@ app.post('/api/v1/ai/prompt/chat', async (req, res) => {
 
   // 打印请求记录
   try {
-    console.log('[Request] /api/v1/ai/prompt/chat ->', JSON.stringify({ 
+    console.log('[Request] /api/v1/ai/prompt/chat/completions ->', JSON.stringify({ 
       promptId, 
       promptParams, 
       ...restBody 
@@ -372,7 +372,7 @@ app.post('/api/v1/ai/prompt/chat', async (req, res) => {
     console.log('[Original Content]', prompt.content.substring(0, 150) + '...');
     console.log('[Processed Content]', processedContent.substring(0, 150) + '...');
   } catch (_) {
-    console.log('[Request] /api/v1/ai/prompt/chat (body not serializable)');
+    console.log('[Request] /api/v1/ai/prompt/chat/completions (body not serializable)');
   }
 
   // 构建新的消息数组，将prompt内容作为系统消息插入到开头
@@ -599,7 +599,7 @@ app.get('/prompt/admin', (_req, res) => {
 你是{{ bold(role) }}，擅长：
 {{ skills.map(formatItem).join('\n') }}</pre>
         <p style="margin-top: 15px;"><strong>API 调用示例：</strong></p>
-        <pre style="background: #2d2d2d; color: #f8f8f2; padding: 12px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin-top: 8px;">POST /api/v1/ai/prompt/chat
+        <pre style="background: #2d2d2d; color: #f8f8f2; padding: 12px; border-radius: 4px; font-size: 12px; overflow-x: auto; margin-top: 8px;">POST /api/v1/ai/prompt/chat/completions
 {
   "prompt": {
     "id": "your-prompt-id",
