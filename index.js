@@ -332,6 +332,33 @@ app.post('/api/v1/ai/chat/completions', async (req, res) => {
   }
 });
 
+/**
+ * 合并提示词
+ * strategy：合并策略
+prepend：默认值，默认提示词为主，最终：默认提示词+场景提示词
+append：场景提示词为主，最终：场景提示词+默认提示词
+ignore：优先场景提示词，最终：场景提示词 || 默认提示词
+disable：关闭默认提示词，只使用场景提示词，最终：场景提示词 || 无提示词
+override：只使用默认提示词，最终：默认提示词
+ */
+const getMergedPromptByStrategy = (processedPrompt, currentPrompt = '', strategy = 'prepend') => {
+  switch (strategy) {
+    case 'append':
+      return currentPrompt + '\n\n' +  processedPrompt;
+    case 'ignore':
+      return currentPrompt || processedPrompt;
+    case 'disable':
+      return currentPrompt || '';
+    case 'override':
+      return processedPrompt;
+    case 'prepend':
+      return processedPrompt + '\n\n' + currentPrompt;
+    default:
+      return processedPrompt + '\n\n' + currentPrompt;
+  }
+}
+
+
 // Prompt Chat 接口 - 使用预设的prompt作为系统提示词，支持占位符参数
 app.post('/api/v1/ai/prompt/chat/completions', async (req, res) => {
   const authHeader = req.headers['authorization'] || '';
@@ -377,22 +404,22 @@ app.post('/api/v1/ai/prompt/chat/completions', async (req, res) => {
 
   // 构建新的消息数组，将prompt内容作为系统消息插入到开头
   const messages = restBody.messages || [];
-  const systemMessage = {
-    role: 'system',
-    content: processedContent
-  };
   
-  // 如果已有system消息，将prompt追加到第一个system消息中；否则插入到开头
-  const firstSystemIndex = messages.findIndex(m => m.role === 'system');
-  let newMessages;
-  if (firstSystemIndex >= 0) {
-    newMessages = [...messages];
-    newMessages[firstSystemIndex] = {
-      ...newMessages[firstSystemIndex],
-      content: processedContent + '\n\n' + newMessages[firstSystemIndex].content
-    };
-  } else {
-    newMessages = [systemMessage, ...messages];
+  let newMessages = [...messages];
+  const promptStrategy = promptConfig.strategy || 'prepend';  // 可选项： prepend/append/override/ignore/disable/
+  const firstSystemIndex = newMessages.findIndex(m => m.role === 'system');
+  const currentSystemPrompt = firstSystemIndex > -1 ? newMessages[firstSystemIndex].content : ''
+  const systemPromptContent = getMergedPromptByStrategy(processedContent, currentSystemPrompt, promptStrategy).trim();
+
+  if (systemPromptContent) {
+    if (firstSystemIndex >= 0) {
+      newMessages[firstSystemIndex] = {
+        ...newMessages[firstSystemIndex],
+        content: systemPromptContent
+      };
+    } else {
+      newMessages.unshift({ role: 'system', content: systemPromptContent });
+    }
   }
 
   const requestBody = {
@@ -408,9 +435,11 @@ app.post('/api/v1/ai/prompt/chat/completions', async (req, res) => {
       prompt: {
         id: promptId,
         name: prompt.name,
+        strategy: promptStrategy,
         description: prompt.description,
         originalContent: prompt.content,
         processedContent: processedContent,
+        finalContent: systemPromptContent,
         params: promptParams
       },
       messages: newMessages,
