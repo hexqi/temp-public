@@ -12,6 +12,6 @@ router.get('/download', requireAuth, downloadController.getDownloadPage);
 router.get('/download/:filename', requireAuth, downloadController.downloadFile);
 
 // API endpoint to list files (requires auth)
-router.get('/api/files', requireAuth, downloadController.listFiles);
+router.get('/files', requireAuth, downloadController.listFiles);
 
 module.exports = router;

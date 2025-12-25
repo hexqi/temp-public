@@ -36,6 +36,13 @@ app.use(session({
   name: 'fileService.sid'
 }));
 
+// Template engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Static files
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

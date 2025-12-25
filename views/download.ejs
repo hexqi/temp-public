@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Download Service</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>File Download Service</h1>
+      <div class="nav-buttons">
+        <a href="/file/upload" class="nav-btn secondary">Upload</a>
+        <a href="/file/download" class="nav-btn primary">Download</a>
+        <a href="/file/logout" class="nav-btn secondary">Logout</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="info-box">
+        <strong>Download Directory:</strong> <%- downloadDir %><br>
+        <strong>Total Files:</strong> <%- files.length %>
+      </div>
+
+      <% if (files.length === 0) { %>
+        <div class="no-files">
+          <h3>No files available for download</h3>
+          <p>Files will appear here once they are added to the download directory</p>
+        </div>
+      <% } else { %>
+        <table class="file-table">
+          <thead>
+            <tr>
+              <th>Filename</th>
+              <th>Size</th>
+              <th>Modified</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% files.forEach(file => { %>
+              <tr>
+                <td class="file-name"><%- escapeHtml(file.name) %></td>
+                <td class="file-size"><%- file.sizeFormatted %></td>
+                <td class="file-date"><%- file.modifiedFormatted %></td>
+                <td>
+                  <a href="/file/download/<%= encodeURIComponent(file.name) %>"
+                     class="download-btn"
+                     download="<%- escapeHtml(file.name) %>">
+                    Download
+                  </a>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+
+        <div class="cli-info">
+          <strong>CLI Download Command:</strong><br>
+          wget "<%= protocol %>://<%= host %>/file/download/<filename>" -O <filename><br><br>
+          curl -o <filename> "<%= protocol %>://<%= host %>/file/download/<filename>"
+        </div>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

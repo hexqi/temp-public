@@ -53,6 +53,6 @@ router.get('/logout', handleLogout);
 router.get('/upload', requireAuth, uploadController.getUploadPage);
 
 // Upload API endpoint (requires auth)
-router.post('/api/file/upload', requireAuth, upload.array('files', 10), uploadController.handleUpload);
+router.post('/upload', requireAuth, upload.array('files', 10), uploadController.handleUpload);
 
 module.exports = router;

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload Service</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>File Upload Service</h1>
+      <div class="nav-buttons">
+        <a href="/file/upload" class="nav-btn primary">Upload</a>
+        <a href="/file/download" class="nav-btn secondary">Download</a>
+        <a href="/file/logout" class="nav-btn secondary">Logout</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="info-box">
+        <strong>Maximum file size:</strong> <%- maxFileSizeDisplay %><br>
+        <strong>Allowed file types:</strong> <%- allowedTypesDisplay %>
+      </div>
+
+      <div class="upload-area" id="uploadArea">
+        <h2>Drag & Drop Files Here</h2>
+        <p>or click to browse</p>
+      </div>
+
+      <input type="file" id="fileInput" multiple>
+
+      <div class="text-file-creator">
+        <h3>Create Text File</h3>
+        <input type="text" id="textFileName" placeholder="Enter filename (e.g., notes.txt)">
+        <textarea id="textFileContent" placeholder="Enter file content..."></textarea>
+        <button class="btn-add" onclick="addTextFile()">Add Text File</button>
+      </div>
+
+      <div class="file-list" id="fileList"></div>
+
+      <button class="btn btn-primary" id="uploadBtn" onclick="uploadFiles()" disabled>
+        Upload All Files
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let filesToUpload = [];
+
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+      fileInput.value = '';
+    });
+
+    function handleFiles(files) {
+      for (const file of files) {
+        filesToUpload.push({
+          file: file,
+          id: Date.now() + Math.random(),
+          progress: 0,
+          status: 'pending'
+        });
+      }
+      renderFileList();
+    }
+
+    function addTextFile() {
+      const fileName = document.getElementById('textFileName').value.trim();
+      const content = document.getElementById('textFileContent').value;
+
+      if (!fileName) {
+        alert('Please enter a filename');
+        return;
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const file = new File([blob], fileName, { type: 'text/plain' });
+
+      filesToUpload.push({
+        file: file,
+        id: Date.now() + Math.random(),
+        progress: 0,
+        status: 'pending'
+      });
+
+      document.getElementById('textFileName').value = '';
+      document.getElementById('textFileContent').value = '';
+
+      renderFileList();
+    }
+
+    function removeFile(id) {
+      filesToUpload = filesToUpload.filter(f => f.id !== id);
+      renderFileList();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function renderFileList() {
+      if (filesToUpload.length === 0) {
+        fileList.innerHTML = '';
+        uploadBtn.disabled = true;
+        return;
+      }
+
+      uploadBtn.disabled = false;
+
+      fileList.innerHTML = filesToUpload.map(item => `
+        <div class="file-item">
+          <div class="file-info">
+            <div class="file-name">${item.file.name}</div>
+            <div class="file-size">${formatFileSize(item.file.size)}</div>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${item.progress}%"></div>
+            </div>
+            <div class="progress-text">${item.progress}%</div>
+          </div>
+          <div class="file-status status-${item.status}">
+            ${item.status === 'pending' ? 'Pending' :
+              item.status === 'uploading' ? 'Uploading...' :
+              item.status === 'success' ? 'Complete' : 'Failed'}
+          </div>
+          <button class="btn-remove" onclick="removeFile(${item.id})"
+            ${item.status === 'uploading' ? 'disabled' : ''}>
+            Remove
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function uploadFiles() {
+      const pendingFiles = filesToUpload.filter(f => f.status === 'pending');
+
+      if (pendingFiles.length === 0) return;
+
+      uploadBtn.disabled = true;
+
+      for (const item of pendingFiles) {
+        await uploadSingleFile(item);
+      }
+
+      uploadBtn.disabled = false;
+    }
+
+    function uploadSingleFile(item) {
+      return new Promise((resolve) => {
+        const formData = new FormData();
+        formData.append('files', item.file);
+
+        item.status = 'uploading';
+        renderFileList();
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            item.progress = Math.round((e.loaded / e.total) * 100);
+            renderFileList();
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            item.status = 'success';
+            item.progress = 100;
+          } else {
+            item.status = 'error';
+          }
+          renderFileList();
+          resolve();
+        });
+
+        xhr.addEventListener('error', () => {
+          item.status = 'error';
+          renderFileList();
+          resolve();
+        });
+
+        xhr.open('POST', '/file/upload');
+        xhr.send(formData);
+      });
+    }
+
+    renderFileList();
+  </script>
+</body>
+</html>
