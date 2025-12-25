@@ -87,7 +87,7 @@ You will be prompted to enter the password configured in `.env`.
 |--------|----------|-------------|
 | POST | `/file/login` | Login with password |
 | GET | `/file/logout` | Logout |
-| GET | `/health` | Health check |
+| GET | `/file/health` | Health check |
 
 ### Protected (Requires Authentication)
 

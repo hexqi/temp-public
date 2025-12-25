@@ -41,7 +41,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Static files
-app.use('/static', express.static(path.join(__dirname, 'public')));
+app.use('/file/static', express.static(path.join(__dirname, 'public')));
 
 // Body parsing middleware
 app.use(express.json());
@@ -51,8 +51,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/file', uploadRoutes);
 app.use('/file', downloadRoutes);
 
+app.get('/file', (req, res) => {
+  res.redirect(301, '/file/upload');
+});
+
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/file/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
